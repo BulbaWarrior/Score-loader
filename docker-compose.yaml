@@ -1,9 +1,126 @@
-version: '3.3'
-services:
+version: '3'
   
+services:
   app:
-    
     build: .
-    command: "python manage.py runserver 0:80"
+    container_name: app
+    ports:
+      - 80
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`$HOST/app`)"
+      - "traefik.http.routers.app-secure.rule=Host(`$HOST/app`)"
+      - "traefik.http.middlewares.example.stripprefix.prefixes=/app"
+      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
+      - "traefik.http.routers.app.service=app"
+      - "traefik.http.routers.app-secure.service=app"
+      - "traefik.http.routers.app-secure.entrypoints=websecure"
+      - "traefik.http.routers.app.entrypoints=web"
+      - "traefik.http.routers.app-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.services.app.loadbalancer.server.port=80"
+    restart: unless-stopped
+    deploy: 
+      replicas: 3
+      resources:
+        reservations:
+          cpus: '0.15'
+
+  prometheus:
+    image: bulbawarrior/prom
+    build: ./prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - 9090
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+    links:
+        - cadvisor:cadvisor
+    depends_on:
+        - cadvisor
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`$HOST/prometheus`)"
+      - "traefik.http.routers.prometheus-secure.rule=Host(`$HOST/prometheus`)"
+      - "traefik.http.middlewares.example.stripprefix.prefixes=/prometheus"
+      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
+      - "traefik.http.routers.prometheus.service=prometheus"
+      - "traefik.http.routers.prometheus-secure.service=prometheus"
+      - "traefik.http.routers.prometheus-secure.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.routers.prometheus-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=80"
+
+  cadvisor:
+    image: gcr.io/google-containers/cadvisor:latest
+    hostname: '{{.Node.ID}}'
+    volumes:
+        - /:/rootfs:ro
+        - /var/run:/var/run:ro
+        - /sys:/sys:ro
+        - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+        - 8080
+    restart: unless-stopped
+    deploy:
+        mode: global
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cadvisor.rule=Host(`$HOST/cadvisor`)"
+      - "traefik.http.routers.cadvisor-secure.rule=Host(`$HOST/cadvisor`)"
+      - "traefik.http.middlewares.example.stripprefix.prefixes=/cadvisor"
+      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
+      - "traefik.http.routers.cadvisor.service=cadvisor"
+      - "traefik.http.routers.cadvisor-secure.service=cadvisor"
+      - "traefik.http.routers.cadvisor-secure.entrypoints=websecure"
+      - "traefik.http.routers.cadvisor.entrypoints=web"
+      - "traefik.http.routers.cadvisor-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.services.cadvisor.loadbalancer.server.port=80"
+
+  grafana:
+    image: grafana/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - 3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`$HOST/grafana`)"
+      - "traefik.http.routers.grafana-secure.rule=Host(`$HOST/grafana`)"
+      - "traefik.http.middlewares.example.stripprefix.prefixes=/grafana"
+      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
+      - "traefik.http.routers.grafana.service=grafana"
+      - "traefik.http.routers.grafana-secure.service=grafana"
+      - "traefik.http.routers.grafana-secure.entrypoints=websecure"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.routers.grafana-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=80"
+
+  proxy:
+    image: traefik:2.2
+    container_name: proxy
+    command:
+      - "--log.level=DEBUG"
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.storage=acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    restart: unless-stopped
+
+volumes:
+  grafana_data:
