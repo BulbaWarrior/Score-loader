@@ -8,6 +8,7 @@ from django.http import HttpResponse
 
 from django.shortcuts import render
 
+
 @api_view(['POST'])
 def return_pdf(request):
     url = request.data['url']
@@ -17,9 +18,8 @@ def return_pdf(request):
     response = HttpResponse(buff.read(), content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="score.pdf"'
     return response
-    
+
 
 def index(request):
 
     return render(request, 'scores/index.html', {})
-    

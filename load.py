@@ -1,8 +1,14 @@
 #! /usr/bin/python3
 
+from urllib.error import HTTPError
+from cairosvg import svg2pdf
+from html.parser import HTMLParser
+from PyPDF2 import PdfFileReader, PdfFileWriter
+from io import BytesIO
 from urllib import request
 
 test_url = "https://musescore.com/valky/the-champions-ballad-the-legend-of-zelda-breath-of-the-wild"
+
 
 def get_string(url):
     fp = request.urlopen(url)
@@ -11,7 +17,6 @@ def get_string(url):
     mystr = mybytes.decode("utf8")
     return mystr
 
-from html.parser import HTMLParser
 
 class MyParser(HTMLParser):
     def __init__(self, *args, **kwargs):
@@ -25,11 +30,9 @@ class MyParser(HTMLParser):
                 self.svg_urls.append(attrs['href'])
                 if attrs['rel'] == 'preload':
                     self.score_url = attrs['href']
-                    
+
         except KeyError:
             return
-        
-            
 
 
 def parse_html(html):
@@ -39,8 +42,6 @@ def parse_html(html):
 
 # continue from here
 
-from cairosvg import svg2pdf
-from io import BytesIO
 
 def get_pdf_page(url):
 
@@ -48,21 +49,17 @@ def get_pdf_page(url):
     return BytesIO(mybytes)
 
 
-
-from PyPDF2 import PdfFileReader, PdfFileWriter
-
 def gen_pdf(input_streams, output_stream):
 
     writer = PdfFileWriter()
 
     for reader in map(PdfFileReader, input_streams):
-        writer.addPage(reader.getPage(0)) # all the pdfs are 1 page long
+        writer.addPage(reader.getPage(0))  # all the pdfs are 1 page long
         # since they are generated from separate .svg files
     writer.write(output_stream)
     for f in input_streams:
         f.close()
 
-from urllib.error import HTTPError
 
 def main(musescore_url, output_file_name='score.pdf'):
     html = get_string(musescore_url)
@@ -78,7 +75,7 @@ def main(musescore_url, output_file_name='score.pdf'):
             pdf_stream = get_pdf_page(svg_url)
         except HTTPError:
             break
-        
+
         pdf_streams.append(pdf_stream)
 
         svg_url = svg_url.replace(f'/score_{i}.svg', f'/score_{i+1}.svg')
@@ -95,7 +92,3 @@ if __name__ == '__main__':
         exit()
 
     main(argv[1], argv[2])
-    
-
-
-
