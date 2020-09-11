@@ -2,28 +2,28 @@ version: '3'
   
 services:
   app:
+    image: bulbawarrior/app
     build: .
     container_name: app
     ports:
       - 80
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.app.rule=Host(`$HOST/app`)"
-      - "traefik.http.routers.app-secure.rule=Host(`$HOST/app`)"
-      - "traefik.http.middlewares.example.stripprefix.prefixes=/app"
-      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
-      - "traefik.http.routers.app.service=app"
-      - "traefik.http.routers.app-secure.service=app"
-      - "traefik.http.routers.app-secure.entrypoints=websecure"
-      - "traefik.http.routers.app.entrypoints=web"
-      - "traefik.http.routers.app-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.services.app.loadbalancer.server.port=80"
+      - "traefik.http.routers.app-gateway.rule=Host(`$HOST`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.app-gateway.entrypoints=websecure"
+      - "traefik.http.routers.app-gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.app-gateway.middlewares=app-gateway-stripprefix"
+      - "traefik.http.middlewares.app-gateway-stripprefix.stripprefix.prefixes=/app"
+      - "traefik.http.services.app-gateway.loadbalancer.server.port=80"
+    networks:
+      - public
+      - default
     restart: unless-stopped
-    deploy: 
-      replicas: 3
-      resources:
-        reservations:
-          cpus: '0.15'
+    #deploy: 
+    #  replicas: 3
+    #  resources:
+    #    reservations:
+    #      cpus: '0.15'
 
   prometheus:
     image: bulbawarrior/prom
@@ -32,27 +32,26 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
     ports:
       - 9090
-    deploy:
-      placement:
-        constraints:
-          - node.role == manager
+    #deploy:
+    #  placement:
+    #    constraints:
+    #      - node.role == manager
     links:
         - cadvisor:cadvisor
     depends_on:
         - cadvisor
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`$HOST/prometheus`)"
-      - "traefik.http.routers.prometheus-secure.rule=Host(`$HOST/prometheus`)"
-      - "traefik.http.middlewares.example.stripprefix.prefixes=/prometheus"
-      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
-      - "traefik.http.routers.prometheus.service=prometheus"
-      - "traefik.http.routers.prometheus-secure.service=prometheus"
-      - "traefik.http.routers.prometheus-secure.entrypoints=websecure"
-      - "traefik.http.routers.prometheus.entrypoints=web"
-      - "traefik.http.routers.prometheus-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.services.prometheus.loadbalancer.server.port=80"
+      - "traefik.http.routers.prometheus-gateway.rule=Host(`$HOST`) && PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus-gateway.entrypoints=websecure"
+      - "traefik.http.routers.prometheus-gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prometheus-gateway.middlewares=prometheus-gateway-stripprefix"
+      - "traefik.http.middlewares.prometheus-gateway-stripprefix.stripprefix.prefixes=/prometheus"
+      - "traefik.http.services.prometheus-gateway.loadbalancer.server.port=80"
+    networks:
+      - public
+      - default
+    restart: unless-stopped
 
   cadvisor:
     image: gcr.io/google-containers/cadvisor:latest
@@ -64,21 +63,20 @@ services:
         - /var/lib/docker/:/var/lib/docker:ro
     ports:
         - 8080
-    restart: unless-stopped
     deploy:
         mode: global
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.cadvisor.rule=Host(`$HOST/cadvisor`)"
-      - "traefik.http.routers.cadvisor-secure.rule=Host(`$HOST/cadvisor`)"
-      - "traefik.http.middlewares.example.stripprefix.prefixes=/cadvisor"
-      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
-      - "traefik.http.routers.cadvisor.service=cadvisor"
-      - "traefik.http.routers.cadvisor-secure.service=cadvisor"
-      - "traefik.http.routers.cadvisor-secure.entrypoints=websecure"
-      - "traefik.http.routers.cadvisor.entrypoints=web"
-      - "traefik.http.routers.cadvisor-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.services.cadvisor.loadbalancer.server.port=80"
+      - "traefik.http.routers.cadvisor-gateway.rule=Host(`$HOST`) && PathPrefix(`/cadvisor`)"
+      - "traefik.http.routers.cadvisor-gateway.entrypoints=websecure"
+      - "traefik.http.routers.cadvisor-gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.cadvisor-gateway.middlewares=cadvisor-gateway-stripprefix"
+      - "traefik.http.middlewares.cadvisor-gateway-stripprefix.stripprefix.prefixes=/cadvisor"
+      - "traefik.http.services.cadvisor-gateway.loadbalancer.server.port=80"
+    networks:
+      - public
+      - default
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana
@@ -88,39 +86,37 @@ services:
       - 3000
     volumes:
       - grafana_data:/var/lib/grafana
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`$HOST/grafana`)"
-      - "traefik.http.routers.grafana-secure.rule=Host(`$HOST/grafana`)"
-      - "traefik.http.middlewares.example.stripprefix.prefixes=/grafana"
-      - "traefik.http.middlewares.example.stripprefix.forceslash=false"
-      - "traefik.http.routers.grafana.service=grafana"
-      - "traefik.http.routers.grafana-secure.service=grafana"
-      - "traefik.http.routers.grafana-secure.entrypoints=websecure"
-      - "traefik.http.routers.grafana.entrypoints=web"
-      - "traefik.http.routers.grafana-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.services.grafana.loadbalancer.server.port=80"
+      - "traefik.http.routers.grafana-gateway.rule=Host(`$HOST`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-gateway.entrypoints=websecure"
+      - "traefik.http.routers.grafana-gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.grafana-gateway.middlewares=grafana-gateway-stripprefix"
+      - "traefik.http.middlewares.grafana-gateway-stripprefix.stripprefix.prefixes=/grafana"
+      - "traefik.http.services.grafana-gateway.loadbalancer.server.port=80"
+    networks:
+      - public
+      - default
+    restart: unless-stopped
 
   proxy:
-    image: traefik:2.2
-    container_name: proxy
-    command:
-      - "--log.level=DEBUG"
-      - "--api.insecure=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.storage=acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    image: bulbawarrior/traefik
+    build: ./traefik
+    container_name: traefik
     ports:
       - "80:80"
       - "443:443"
+      # - "8081:8080"
+    networks:
+      - public
+      - default
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
 volumes:
   grafana_data:
+
+networks:
+  public:
+    external: true

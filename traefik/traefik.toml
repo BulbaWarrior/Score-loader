@@ -1,0 +1,33 @@
+enable = true
+
+[providers.docker]
+endpoint =  "unix:///var/run/docker.sock"
+exposedbydefault = false
+network = "public"
+
+[log]
+level = "DEBUG"
+
+[certificatesresolvers.letsencrypt.acme]
+storage = "acme.json"
+  [certificatesresolvers.letsencrypt.acme.httpchallenge]
+  entrypoint = "web"
+
+[api]
+#insecure = true
+dashboard = true
+debug = true
+
+[entryPoints]
+  [entryPoints.web]
+  address = ":80"
+    [entryPoints.web.http.redirections.entrypoint]
+	to = "websecure"
+	scheme = "https"
+  [entryPoints.websecure]
+  address = ":443"
+
+[accessLog]
+filePath = "/var/log/traefik/access.log"
+  [accessLog.filters]
+  statusCodes = "404"
