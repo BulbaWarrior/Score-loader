@@ -1,0 +1,9 @@
+version: '3.3'
+services:
+  
+  app:
+    
+    build: .
+    command: "python manage.py runserver 0:80"
+    ports:
+      - "80:80"
